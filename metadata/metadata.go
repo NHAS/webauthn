@@ -7,11 +7,13 @@ import (
 	"net/http"
 	"reflect"
 
-	"github.com/NHAS/webauthn/protocol/webauthncose"
-	"github.com/go-webauthn/revoke"
 	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
+
+	"github.com/go-webauthn/x/revoke"
+
+	"github.com/NHAS/webauthn/protocol/webauthncose"
 )
 
 type PublicKeyCredentialParameters struct {

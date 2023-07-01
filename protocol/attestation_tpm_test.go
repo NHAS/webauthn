@@ -16,7 +16,7 @@ import (
 
 	"github.com/NHAS/webauthn/protocol/webauthncbor"
 	"github.com/NHAS/webauthn/protocol/webauthncose"
-	"github.com/google/go-tpm/tpm2"
+	"github.com/google/go-tpm/legacy/tpm2"
 	"github.com/stretchr/testify/assert"
 )
 

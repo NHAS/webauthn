@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/go-tpm/tpm2"
+	"github.com/google/go-tpm/legacy/tpm2"
 
 	"github.com/NHAS/webauthn/metadata"
 	"github.com/NHAS/webauthn/protocol/webauthncose"
