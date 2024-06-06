@@ -3,7 +3,6 @@ package protocol
 import (
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
 	"io"
 	"net/http"
 )
@@ -32,6 +31,7 @@ type ParsedCredential struct {
 
 type PublicKeyCredential struct {
 	Credential
+
 	RawID                   URLEncodedBase64                      `json:"rawId"`
 	ClientExtensionResults  AuthenticationExtensionsClientOutputs `json:"clientExtensionResults,omitempty"`
 	AuthenticatorAttachment string                                `json:"authenticatorAttachment,omitempty"`
@@ -39,6 +39,7 @@ type PublicKeyCredential struct {
 
 type ParsedPublicKeyCredential struct {
 	ParsedCredential
+
 	RawID                   []byte                                `json:"rawId"`
 	ClientExtensionResults  AuthenticationExtensionsClientOutputs `json:"clientExtensionResults,omitempty"`
 	AuthenticatorAttachment AuthenticatorAttachment               `json:"authenticatorAttachment,omitempty"`
@@ -46,33 +47,36 @@ type ParsedPublicKeyCredential struct {
 
 type CredentialCreationResponse struct {
 	PublicKeyCredential
-	AttestationResponse AuthenticatorAttestationResponse `json:"response"`
 
-	// Deprecated: Transports is deprecated due to upstream changes to the API. 
-	// Use the Transports field of AuthenticatorAttestationResponse
-	// instead. Transports is kept for backward compatibility, and should not
-	// be used by new clients.
-	Transports []string `json:"transports,omitempty"`
+	AttestationResponse AuthenticatorAttestationResponse `json:"response"`
 }
 
 type ParsedCredentialCreationData struct {
 	ParsedPublicKeyCredential
+
 	Response ParsedAttestationResponse
 	Raw      CredentialCreationResponse
 }
 
+// ParseCredentialCreationResponse is a non-agnostic function for parsing a registration response from the http library
+// from stdlib. It handles some standard cleanup operations.
 func ParseCredentialCreationResponse(response *http.Request) (*ParsedCredentialCreationData, error) {
 	if response == nil || response.Body == nil {
 		return nil, ErrBadRequest.WithDetails("No response given")
 	}
 
+	defer response.Body.Close()
+	defer io.Copy(io.Discard, response.Body)
+
 	return ParseCredentialCreationResponseBody(response.Body)
 }
 
+// ParseCredentialCreationResponseBody is an agnostic version of ParseCredentialCreationResponse. Implementers are
+// therefore responsible for managing cleanup.
 func ParseCredentialCreationResponseBody(body io.Reader) (pcc *ParsedCredentialCreationData, err error) {
 	var ccr CredentialCreationResponse
 
-	if err = json.NewDecoder(body).Decode(&ccr); err != nil {
+	if err = decodeBody(body, &ccr); err != nil {
 		return nil, ErrBadRequest.WithDetails("Parse error for Registration").WithInfo(err.Error())
 	}
 
@@ -106,13 +110,6 @@ func (ccr CredentialCreationResponse) Parse() (pcc *ParsedCredentialCreationData
 		return nil, ErrParsingData.WithDetails("Error parsing attestation response")
 	}
 
-	// TODO: Remove this as it's a backwards compatibility layer.
-	if len(response.Transports) == 0 && len(ccr.Transports) != 0 {
-		for _, t := range ccr.Transports {
-			response.Transports = append(response.Transports, AuthenticatorTransport(t))
-		}
-	}
-
 	var attachment AuthenticatorAttachment
 
 	switch ccr.AuthenticatorAttachment {
@@ -134,9 +131,9 @@ func (ccr CredentialCreationResponse) Parse() (pcc *ParsedCredentialCreationData
 // Verify the Client and Attestation data.
 //
 // Specification: §7.1. Registering a New Credential (https://www.w3.org/TR/webauthn/#sctn-registering-a-new-credential)
-func (pcc *ParsedCredentialCreationData) Verify(storedChallenge string, verifyUser bool, relyingPartyID string, relyingPartyOrigins []string) error {
+func (pcc *ParsedCredentialCreationData) Verify(storedChallenge string, verifyUser bool, relyingPartyID string, rpOrigins, rpTopOrigins []string, rpTopOriginsVerify TopOriginVerificationMode) error {
 	// Handles steps 3 through 6 - Verifying the Client Data against the Relying Party's stored data
-	verifyError := pcc.Response.CollectedClientData.Verify(storedChallenge, CreateCeremony, relyingPartyOrigins)
+	verifyError := pcc.Response.CollectedClientData.Verify(storedChallenge, CreateCeremony, rpOrigins, rpTopOrigins, rpTopOriginsVerify)
 	if verifyError != nil {
 		return verifyError
 	}

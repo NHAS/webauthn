@@ -19,9 +19,9 @@ var (
 func main() {
 	// Your initialization function
 	web, err = webauthn.New(&webauthn.Config{
-		RPDisplayName: "Foobar Corp.",          // Display Name for your site
-		RPID:          "localhost",             // Generally the domain name for your site
-		RPOrigin:      "http://localhost:8080", // The origin URL for WebAuthn requests
+		RPDisplayName: "Foobar Corp.",                    // Display Name for your site
+		RPID:          "localhost",                       // Generally the domain name for your site
+		RPOrigins:     []string{"http://localhost:8080"}, // The origin URL for WebAuthn requests
 	})
 
 	if err != nil {
